@@ -1,0 +1,4 @@
+# Sample enhanced PID profile format.
+# This file is for simulator/development only. Replace with verified open or user-provided 2010 Nissan 370Z definitions.
+module,mode,pid,name,unit,scale,offset,value_bytes,description
+7E0,22,1001,Sample enhanced sensor,count,1,0,2,Simulator-only placeholder showing how imported Nissan enhanced PIDs are decoded

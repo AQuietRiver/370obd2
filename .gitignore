@@ -1,0 +1,23 @@
+# Build outputs
+main
+*.exe
+*.out
+*.o
+build/
+
+# Local/editor files
+.vscode/
+.idea/
+.DS_Store
+
+# Local tool caches
+.tokensave/
+.headroom/
+
+# Copyrighted service manuals (kept local only)
+manuals/
+
+# Local dev-workflow notes (kept local only)
+CLAUDE.md
+AGENTS.md
+.ai/
