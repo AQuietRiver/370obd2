@@ -124,7 +124,11 @@ std::string PosixElm327Transport::readUntilPrompt(std::string* error) {
             return raw;
         }
         if (count == 0) {
-            return raw;
+            // VTIME expired with no bytes available (an idle read, not EOF --
+            // a real ELM327 routinely goes quiet for over a second while
+            // resetting or auto-detecting the bus protocol). Keep polling
+            // until the overall deadline above actually elapses.
+            continue;
         }
         raw.append(buffer, buffer + count);
         if (raw.find('>') != std::string::npos) {
@@ -167,13 +171,23 @@ ObdResponse PosixElm327Transport::send(const ObdCommand& command) {
         response.error = error;
         return response;
     }
+    static const char* const kAdapterErrors[] = {
+        "UNABLE TO CONNECT", "CAN ERROR", "BUFFER FULL", "STOPPED",
+    };
+    for (const char* marker : kAdapterErrors) {
+        if (response.raw.find(marker) != std::string::npos) {
+            response.ok = false;
+            response.error = std::string("adapter error: ") + marker;
+            return response;
+        }
+    }
     if (response.raw.find("NO DATA") != std::string::npos || response.raw.find("?") != std::string::npos) {
         response.ok = false;
         response.error = "no response";
         return response;
     }
 
-    response.bytes = ObdParser::parseHexBytes(response.raw);
+    response.bytes = ObdParser::parseHexBytes(ObdParser::stripAdapterChatter(response.raw));
     return response;
 }
 

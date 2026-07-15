@@ -30,6 +30,21 @@ int main() {
     }
 
     {
+        // "SEARCHING..." (auto protocol detection) and "BUS INIT: OK" chatter
+        // can appear on their own lines ahead of the real data line; both
+        // contain letters that are also valid hex digits (A, C, E / B), so
+        // they must be dropped as whole lines rather than filtered
+        // character-by-character.
+        const auto cleaned = obd::ObdParser::stripAdapterChatter(
+            "SEARCHING...\r\rBUS INIT: OK\r\r41 00 BE 1F A8 13\r\r>");
+        assert(cleaned == "41 00 BE 1F A8 13");
+        assert(obd::ObdParser::parseHexBytes(cleaned).size() == 6);
+
+        assert(obd::ObdParser::stripAdapterChatter("SEARCHING...\r>").empty());
+        assert(obd::ObdParser::stripAdapterChatter("").empty());
+    }
+
+    {
         const auto path = std::filesystem::temp_directory_path() / "370obd2-bad-profile.csv";
         {
             std::ofstream output(path);

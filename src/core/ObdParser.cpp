@@ -33,7 +33,51 @@ std::string decodeDtcCode(uint8_t high, uint8_t low) {
     return code;
 }
 
+bool isHexDataLine(const std::string& line) {
+    bool sawHexDigit = false;
+    for (char ch : line) {
+        if (ch == ' ' || ch == '\t') {
+            continue;
+        }
+        if (hexValue(ch) < 0) {
+            return false;
+        }
+        sawHexDigit = true;
+    }
+    return sawHexDigit;
+}
+
 } // namespace
+
+// The ELM327 interleaves protocol-status chatter (e.g. "SEARCHING...",
+// "BUS INIT: OK") with real data lines, most often while auto-detecting the
+// protocol on the first query after connecting. Several of those words
+// contain letters (A, C, E) that are also valid hex digits, so filtering at
+// the character level (as parseHexBytes does) would silently misalign the
+// decoded bytes. Keep only whole lines that are pure hex/whitespace before
+// handing the response to the byte parser.
+std::string ObdParser::stripAdapterChatter(const std::string& raw) {
+    std::string result;
+    std::string line;
+    auto flushLine = [&]() {
+        if (isHexDataLine(line)) {
+            if (!result.empty()) {
+                result += ' ';
+            }
+            result += line;
+        }
+        line.clear();
+    };
+    for (char ch : raw) {
+        if (ch == '\r' || ch == '\n') {
+            flushLine();
+        } else if (ch != '>') {
+            line += ch;
+        }
+    }
+    flushLine();
+    return result;
+}
 
 std::vector<uint8_t> ObdParser::parseHexBytes(const std::string& raw) {
     std::vector<uint8_t> bytes;

@@ -21,6 +21,7 @@ A C++17 OBD-II scanner for the 2009/2010 Nissan 370Z (Z34), with a CLI and a Qt6
   - An OpenRouter-powered diagnostic assistant that can use scan/DTC snapshots, selected service manuals, and technician-logbook history as context.
   - A dedicated Assistant configuration page for password-masked API-key entry, secure OS-keyring storage, model refresh and selection, pricing visibility, and a free-model-only filter enabled by default. API keys are never written to project files or plaintext settings.
   - A local technician logbook (`logbook/`) for saving scan snapshots, notes, and AI analysis for future reference.
+  - Continuous drive recording to CSV (`logbook/recordings/`), with playback controls to reload a saved drive and replay it through the live sensor table and chart at its original pace.
 
 ## Build
 

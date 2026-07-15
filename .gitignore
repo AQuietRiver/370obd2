@@ -17,6 +17,9 @@ build/
 # Copyrighted service manuals (kept local only)
 manuals/
 
+# Recorded live-data drive logs (kept local only)
+logbook/recordings/
+
 # Local dev-workflow notes (kept local only)
 CLAUDE.md
 AGENTS.md

@@ -15,6 +15,7 @@
 #include <QDateTime>
 #include <QDir>
 #include <QDockWidget>
+#include <QFileDialog>
 #include <QFileInfo>
 #include <QFile>
 #include <QFormLayout>
@@ -60,6 +61,50 @@
 #include <qt6keychain/keychain.h>
 
 namespace gui {
+
+namespace {
+// Sensor names come from the user-editable enhanced-PID CSV profile, so quote
+// any field that could otherwise break CSV column alignment.
+QString csvField(const QString& value) {
+    if (!value.contains(',') && !value.contains('"') && !value.contains('\n')) {
+        return value;
+    }
+    QString escaped = value;
+    escaped.replace('"', "\"\"");
+    return "\"" + escaped + "\"";
+}
+
+// Reverses csvField()'s quoting for a single recorded CSV line.
+QStringList parseCsvLine(const QString& line) {
+    QStringList fields;
+    QString field;
+    bool inQuotes = false;
+    for (int i = 0; i < line.size(); ++i) {
+        const QChar ch = line.at(i);
+        if (inQuotes) {
+            if (ch == '"') {
+                if (i + 1 < line.size() && line.at(i + 1) == '"') {
+                    field += '"';
+                    ++i;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                field += ch;
+            }
+        } else if (ch == '"') {
+            inQuotes = true;
+        } else if (ch == ',') {
+            fields << field;
+            field.clear();
+        } else {
+            field += ch;
+        }
+    }
+    fields << field;
+    return fields;
+}
+} // namespace
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     setWindowFlag(Qt::FramelessWindowHint);
@@ -341,10 +386,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
             displayReport(report, source);
             displayDtcs(dtcs);
             setScanBusy(false);
+            if (recording_) {
+                // Continuous drive log: pace repeat scans a couple of seconds
+                // apart rather than firing on a fixed-interval QTimer, so the
+                // next request never overlaps a still-in-flight serial scan.
+                constexpr int kRecordingIntervalMs = 2000;
+                QTimer::singleShot(kRecordingIntervalMs, this, &MainWindow::runSerialScan);
+            }
         });
     connect(scanWorker_, &ScanWorker::operationFailed, this,
         [this](const QString& title, const QString& message) {
             setScanBusy(false);
+            if (recording_) {
+                stopRecording("Recording stopped: " + message);
+            }
             QMessageBox::warning(this, title, message);
         });
     scanThread_->start();
@@ -627,11 +682,16 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     centerToolbarLayout->setSpacing(9);
     auto* visibleViewTitle = new QLabel("Live Data", centerToolbar);
     visibleViewTitle->setObjectName("viewTitle");
-    auto* visiblePause = new QPushButton("Pause", centerToolbar);
-    visiblePause->setEnabled(false);
-    auto* visibleScan = new QPushButton("Scan Vehicle", centerToolbar);
-    visibleScan->setObjectName("primaryButton");
-    connect(visibleScan, &QPushButton::clicked, this, &MainWindow::runSerialScan);
+    playbackToggle_ = new QPushButton("Play", centerToolbar);
+    playbackToggle_->setEnabled(false);
+    connect(playbackToggle_, &QPushButton::clicked, this, &MainWindow::togglePlayback);
+    loadRecordingButton_ = new QPushButton("Load Recording…", centerToolbar);
+    connect(loadRecordingButton_, &QPushButton::clicked, this, &MainWindow::loadRecording);
+    recordToggle_ = new QPushButton("Record", centerToolbar);
+    connect(recordToggle_, &QPushButton::clicked, this, &MainWindow::toggleRecording);
+    scanVehicleButton_ = new QPushButton("Scan Vehicle", centerToolbar);
+    scanVehicleButton_->setObjectName("primaryButton");
+    connect(scanVehicleButton_, &QPushButton::clicked, this, &MainWindow::runSerialScan);
     connect(liveNavigation, &QPushButton::clicked, visibleViewTitle,
         [visibleViewTitle] { visibleViewTitle->setText("Live Data"); });
     connect(dtcNavigation, &QPushButton::clicked, visibleViewTitle,
@@ -640,8 +700,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         [visibleViewTitle] { visibleViewTitle->setText("Assistant Configuration"); });
     centerToolbarLayout->addWidget(visibleViewTitle);
     centerToolbarLayout->addStretch();
-    centerToolbarLayout->addWidget(visiblePause);
-    centerToolbarLayout->addWidget(visibleScan);
+    centerToolbarLayout->addWidget(playbackToggle_);
+    centerToolbarLayout->addWidget(loadRecordingButton_);
+    centerToolbarLayout->addWidget(recordToggle_);
+    centerToolbarLayout->addWidget(scanVehicleButton_);
     centerLayout->addWidget(centerToolbar);
     centerLayout->addWidget(diagnosticPages_, 1);
     shellLayout->addWidget(centerColumn, 1);
@@ -649,7 +711,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     auto* root = new QWidget(this);
     root->setObjectName("rootFrame");
     auto* rootLayout = new QVBoxLayout(root);
-    rootLayout->setContentsMargins(20, 20, 20, 20);
+    rootLayout->setContentsMargins(1, 1, 1, 1);
     rootLayout->setSpacing(0);
 
     titleBar_ = new QWidget(root);
@@ -786,7 +848,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
         QDialog { border: 1px solid #4c5354; }
         #dialogHead { background: #202425; border-bottom: 1px solid #383e3f; }
         #dialogTitle { color: #e4e7e5; font-size: 15px; font-weight: 650; }
-        #rootFrame { background: #171a1b; }
+        #rootFrame { background: #171a1b; border: 1px solid #4c5354; }
         #contentFrame, #applicationShell, #centerColumn { background: #202425; }
         #titleBar { background: #202425; border: 1px solid #4c5354; border-bottom: 1px solid #383e3f; }
         #vehicleMark { color: #d08a3c; border: 2px solid #d08a3c; border-radius: 12px; font-size: 10px; font-weight: 800; }
@@ -877,10 +939,19 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event) {
                 return true;
             }
         }
-        if (event->type() == QEvent::MouseButtonPress) {
-            auto* mouse = static_cast<QMouseEvent*>(event);
-            if (mouse->button() == Qt::LeftButton && windowHandle()) {
-                windowHandle()->startSystemMove();
+    }
+    // The main title bar and every dialog's custom "dialogHead" header
+    // (service manual viewer, tech logbook viewer) are both drag handles for
+    // their respective top-level window -- neither has real OS chrome since
+    // both the main window and its dialogs are frameless.
+    auto* header = qobject_cast<QWidget*>(watched);
+    const bool isDragHandle = header
+        && (watched == titleBar_ || header->objectName() == "dialogHead");
+    if (isDragHandle && event->type() == QEvent::MouseButtonPress) {
+        auto* mouse = static_cast<QMouseEvent*>(event);
+        if (mouse->button() == Qt::LeftButton) {
+            if (auto* topWindow = header->window()->windowHandle()) {
+                topWindow->startSystemMove();
                 return true;
             }
         }
@@ -1333,6 +1404,20 @@ void MainWindow::displayReport(const obd::CoverageReport& report, const QString&
             liveChart_->addSample(QString::fromStdString(value.name), *value.numericValue,
                 QString::fromStdString(value.unit), sampleTime);
         }
+        if (recording_) {
+            const QString csvRow = QDateTime::fromMSecsSinceEpoch(sampleTime).toString(Qt::ISODateWithMs)
+                + "," + csvField(QString::fromStdString(value.module))
+                + "," + csvField(command)
+                + "," + csvField(QString::fromStdString(value.name))
+                + "," + csvField(displayValue)
+                + "," + csvField(QString::fromStdString(value.unit))
+                + "," + csvField(QString::fromStdString(value.status)) + "\n";
+            recordingFile_.write(csvRow.toUtf8());
+            ++recordedSampleCount_;
+        }
+    }
+    if (recording_) {
+        recordingFile_.flush();
     }
     if (!rows.empty()) {
         table_->selectRow(0);
@@ -1406,11 +1491,214 @@ void MainWindow::setScanBusy(bool busy, const QString& message) {
     vehicleClear_->setEnabled(!busy);
     serialPath_->setEnabled(!busy);
     scanProgress_->setVisible(busy);
+    loadRecordingButton_->setEnabled(!busy);
+    playbackToggle_->setEnabled(!busy && !playbackSnapshots_.empty());
     if (!message.isEmpty()) {
         statusBar()->showMessage(message);
     } else if (!busy) {
         statusBar()->clearMessage();
     }
+}
+
+void MainWindow::toggleRecording() {
+    if (recording_) {
+        stopRecording("Recording stopped.");
+        return;
+    }
+    startRecording();
+}
+
+void MainWindow::startRecording() {
+    const QString path = serialPath_->text().trimmed();
+    if (path.isEmpty()) {
+        QMessageBox::information(this, "Missing serial device",
+            "Enter an ELM327 serial device such as /dev/ttyUSB0 before recording.");
+        return;
+    }
+
+    const QString dirPath = QStringLiteral(OBD_PROJECT_SOURCE_DIR "/logbook/recordings");
+    QDir().mkpath(dirPath);
+    const QString fileName = "drive_" + QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") + ".csv";
+    recordingFile_.setFileName(dirPath + "/" + fileName);
+    if (!recordingFile_.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Recording failed",
+            "Could not create " + recordingFile_.fileName());
+        return;
+    }
+    recordingFile_.write("timestamp,module,command,sensor,value,unit,status\n");
+
+    recording_ = true;
+    recordedSampleCount_ = 0;
+    recordToggle_->setText("Stop Recording");
+    serialPath_->setEnabled(false);
+    statusBar()->showMessage("Recording live data to " + recordingFile_.fileName());
+    runSerialScan();
+}
+
+void MainWindow::stopRecording(const QString& statusMessage) {
+    if (!recording_) {
+        return;
+    }
+    recording_ = false;
+    recordToggle_->setText("Record");
+    serialPath_->setEnabled(!scanProgress_->isVisible());
+    const QString path = recordingFile_.fileName();
+    recordingFile_.close();
+    if (!statusMessage.isEmpty()) {
+        statusBar()->showMessage(statusMessage + " Saved " + QString::number(recordedSampleCount_)
+            + " samples to " + path);
+    }
+}
+
+void MainWindow::loadRecording() {
+    if (recording_ || scanProgress_->isVisible()) {
+        QMessageBox::information(this, "Cannot load recording",
+            "Stop the current recording or scan before loading a saved drive log.");
+        return;
+    }
+
+    const QString dirPath = QStringLiteral(OBD_PROJECT_SOURCE_DIR "/logbook/recordings");
+    const QString path = QFileDialog::getOpenFileName(this, "Load Recording", dirPath, "CSV files (*.csv)");
+    if (path.isEmpty()) {
+        return;
+    }
+
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "Load failed", "Could not open " + path);
+        return;
+    }
+
+    std::vector<PlaybackSnapshot> snapshots;
+    QString currentTimestamp;
+    QTextStream in(&file);
+    bool firstLine = true;
+    while (!in.atEnd()) {
+        const QString line = in.readLine();
+        if (firstLine) {
+            firstLine = false;
+            continue;
+        }
+        if (line.isEmpty()) {
+            continue;
+        }
+        const QStringList fields = parseCsvLine(line);
+        if (fields.size() < 7) {
+            continue;
+        }
+        const QString& timestamp = fields[0];
+        if (snapshots.empty() || timestamp != currentTimestamp) {
+            PlaybackSnapshot snapshot;
+            snapshot.timestampMs = QDateTime::fromString(timestamp, Qt::ISODateWithMs).toMSecsSinceEpoch();
+            snapshots.push_back(snapshot);
+            currentTimestamp = timestamp;
+        }
+        PlaybackRow row;
+        row.module = fields[1];
+        row.command = fields[2];
+        row.sensor = fields[3];
+        row.value = fields[4];
+        row.unit = fields[5];
+        row.status = fields[6];
+        snapshots.back().rows.push_back(row);
+    }
+    file.close();
+
+    if (snapshots.empty()) {
+        QMessageBox::information(this, "Empty recording", "No sensor rows found in " + path);
+        return;
+    }
+
+    playbackSnapshots_ = std::move(snapshots);
+    playbackIndex_ = 0;
+    playbackPlaying_ = false;
+    playbackSourceLabel_ = QFileInfo(path).fileName();
+    playbackToggle_->setEnabled(true);
+    playbackToggle_->setText("Play");
+    statusBar()->showMessage(QString("Loaded %1 snapshots from %2")
+        .arg(playbackSnapshots_.size())
+        .arg(playbackSourceLabel_));
+}
+
+void MainWindow::togglePlayback() {
+    if (playbackSnapshots_.empty()) {
+        return;
+    }
+    if (playbackPlaying_) {
+        playbackPlaying_ = false;
+        playbackToggle_->setText("Play");
+        statusBar()->showMessage("Playback paused.");
+        return;
+    }
+
+    if (playbackIndex_ >= static_cast<int>(playbackSnapshots_.size())) {
+        playbackIndex_ = 0;
+    }
+    playbackPlaying_ = true;
+    playbackToggle_->setText("Pause");
+    scanVehicleButton_->setEnabled(false);
+    recordToggle_->setEnabled(false);
+    loadRecordingButton_->setEnabled(false);
+    advancePlayback();
+}
+
+void MainWindow::advancePlayback() {
+    if (!playbackPlaying_) {
+        // Paused: a previously scheduled tick may still fire, but
+        // togglePlayback() already restored button state and the status
+        // message, so there is nothing left to do here.
+        return;
+    }
+    if (playbackIndex_ >= static_cast<int>(playbackSnapshots_.size())) {
+        playbackPlaying_ = false;
+        playbackToggle_->setText("Play");
+        scanVehicleButton_->setEnabled(true);
+        recordToggle_->setEnabled(true);
+        loadRecordingButton_->setEnabled(true);
+        statusBar()->showMessage("Playback finished: " + playbackSourceLabel_);
+        return;
+    }
+
+    const auto& snapshot = playbackSnapshots_[static_cast<size_t>(playbackIndex_)];
+    table_->setRowCount(static_cast<int>(snapshot.rows.size()));
+    for (int row = 0; row < static_cast<int>(snapshot.rows.size()); ++row) {
+        const auto& sample = snapshot.rows[static_cast<size_t>(row)];
+        auto* sensorItem = new QTableWidgetItem(sample.sensor);
+        sensorItem->setData(Qt::UserRole, sample.command);
+        table_->setItem(row, 0, sensorItem);
+        table_->setItem(row, 1, new QTableWidgetItem(sample.module));
+        table_->setItem(row, 2, new QTableWidgetItem(sample.value));
+        table_->setItem(row, 3, new QTableWidgetItem(sample.unit));
+        table_->setItem(row, 4, new QTableWidgetItem(sample.status));
+
+        bool numericOk = false;
+        const double numericValue = sample.value.toDouble(&numericOk);
+        if (numericOk) {
+            liveChart_->addSample(sample.sensor, numericValue, sample.unit, snapshot.timestampMs);
+        }
+    }
+    if (!snapshot.rows.empty()) {
+        table_->selectRow(0);
+        liveChart_->selectSeries(snapshot.rows.front().sensor);
+    }
+
+    const int position = playbackIndex_ + 1;
+    statusBar()->showMessage(QString("Playback %1/%2 — %3")
+        .arg(position)
+        .arg(playbackSnapshots_.size())
+        .arg(playbackSourceLabel_));
+
+    constexpr int kMinStepMs = 200;
+    constexpr int kMaxStepMs = 5000;
+    int delayMs = 1000;
+    if (playbackIndex_ + 1 < static_cast<int>(playbackSnapshots_.size())) {
+        const qint64 delta = playbackSnapshots_[static_cast<size_t>(playbackIndex_ + 1)].timestampMs
+            - snapshot.timestampMs;
+        delayMs = std::clamp(static_cast<int>(delta), kMinStepMs, kMaxStepMs);
+    }
+
+    ++playbackIndex_;
+    QTimer::singleShot(delayMs, this, &MainWindow::advancePlayback);
 }
 
 } // namespace gui

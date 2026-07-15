@@ -1,9 +1,12 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QFile>
 #include <QJsonArray>
 #include <QHash>
 #include <QStringList>
+
+#include <vector>
 
 class QTableWidget;
 class QCheckBox;
@@ -23,6 +26,20 @@ namespace gui {
 
 class ScanWorker;
 class LiveDataChart;
+
+struct PlaybackRow {
+    QString module;
+    QString command;
+    QString sensor;
+    QString value;
+    QString unit;
+    QString status;
+};
+
+struct PlaybackSnapshot {
+    qint64 timestampMs = 0;
+    std::vector<PlaybackRow> rows;
+};
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -51,6 +68,12 @@ private:
     void displayReport(const obd::CoverageReport& report, const QString& source);
     void displayDtcs(const obd::DtcReport& report);
     void setScanBusy(bool busy, const QString& message = {});
+    void toggleRecording();
+    void startRecording();
+    void stopRecording(const QString& statusMessage = {});
+    void loadRecording();
+    void togglePlayback();
+    void advancePlayback();
     QString sensorContext() const;
     QString logbookContext(const QString& question) const;
     QString manualContext(const QStringList& paths, const QString& question) const;
@@ -82,6 +105,18 @@ private:
     QThread* scanThread_ = nullptr;
     ScanWorker* scanWorker_ = nullptr;
     QWidget* titleBar_ = nullptr;
+    QPushButton* recordToggle_ = nullptr;
+    QFile recordingFile_;
+    bool recording_ = false;
+    int recordedSampleCount_ = 0;
+
+    QPushButton* scanVehicleButton_ = nullptr;
+    QPushButton* loadRecordingButton_ = nullptr;
+    QPushButton* playbackToggle_ = nullptr;
+    std::vector<PlaybackSnapshot> playbackSnapshots_;
+    int playbackIndex_ = 0;
+    bool playbackPlaying_ = false;
+    QString playbackSourceLabel_;
     QString aiApiKey_;
     QString scanSource_ = "No sensor scan has been run";
     QJsonArray availableModels_;
