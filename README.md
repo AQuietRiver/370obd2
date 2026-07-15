@@ -11,7 +11,7 @@ A focused OBD-II diagnostic application for the 2009–2010 Nissan 370Z (Z34), b
 
 ## Overview
 
-370 OBD-II combines live vehicle data, trouble-code management, service-manual reference, and technician notes in one desktop workspace. It works with a real ELM327 USB adapter or the included simulator, allowing the application to be explored and tested without connecting to a vehicle.
+370 OBD-II combines live vehicle data, trouble-code management, AI-assisted troubleshooting, service-manual reference, and technician notes in one desktop workspace. It works with a real ELM327 USB adapter or the included simulator, allowing the application to be explored and tested without connecting to a vehicle.
 
 | Capability | Details |
 | --- | --- |
@@ -20,8 +20,31 @@ A focused OBD-II diagnostic application for the 2009–2010 Nissan 370Z (Z34), b
 | Enhanced PIDs | Loads manufacturer-specific definitions from CSV without requiring a rebuild |
 | Recording | Records drive data to CSV and replays it through the sensor table and chart at the original pace |
 | Service information | Opens and searches locally owned factory service-manual PDFs |
-| Diagnostic assistant | Uses optional OpenRouter models with selected scan, DTC, manual, and logbook context |
+| Diagnostic assistant | Helps investigate symptoms and DTCs using the current scan, service manuals, and previous technician notes |
 | Technician logbook | Keeps scan snapshots, observations, and diagnostic analysis together locally |
+
+## AI-assisted troubleshooting
+
+The built-in diagnostic assistant helps turn scan results into a practical troubleshooting path. Instead of asking a general-purpose chatbot without vehicle context, you can choose which diagnostic information accompanies your question:
+
+- Current live sensor values and DTCs
+- Relevant excerpts from locally owned service manuals
+- Previous observations and scan history from the technician logbook
+
+Ask about a fault code, an unusual sensor reading, or a symptom such as a rough idle. The assistant can correlate the available evidence, suggest likely causes, identify useful manual procedures, and propose the next checks to perform. Responses can be saved to the logbook so the investigation remains available for later sessions.
+
+```mermaid
+flowchart LR
+    A[Vehicle scan] --> D[Diagnostic context]
+    B[Service manuals] --> D
+    C[Technician logbook] --> D
+    D --> E[AI assistant]
+    E --> F[Likely causes]
+    E --> G[Recommended checks]
+    E --> H[Relevant procedures]
+```
+
+The assistant is optional and uses OpenRouter. You control when it is used and which available context is included. Its recommendations are a troubleshooting aid and should be verified against service information and physical testing before repairs are made.
 
 ## How it fits together
 
