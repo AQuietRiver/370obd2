@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en" data-theme="console">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>370 OBD-II GUI Concepts</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #e9e9e7;
+      --panel: #f7f7f5;
+      --panel-2: #efefed;
+      --line: #d1d2cf;
+      --line-strong: #b7b8b5;
+      --text: #202220;
+      --muted: #686b68;
+      --accent: #b7292f;
+      --accent-soft: #f3e5e5;
+      --good: #27704d;
+      --warn: #a46118;
+      --row-hover: #e9e9e6;
+      --selected: #e4e5e2;
+      --shadow: 0 14px 36px rgb(0 0 0 / 12%);
+    }
+
+    html[data-theme="graphite"] {
+      --bg: #d8d9d9;
+      --panel: #f4f4f3;
+      --panel-2: #e7e8e7;
+      --line: #c5c7c6;
+      --line-strong: #a9acab;
+      --text: #1e2221;
+      --muted: #656a68;
+      --accent: #315f68;
+      --accent-soft: #dce8e9;
+      --good: #347251;
+      --warn: #9a611e;
+      --row-hover: #e4e7e6;
+      --selected: #dce5e5;
+    }
+
+    html[data-theme="console"] {
+      color-scheme: dark;
+      --bg: #171a1b;
+      --panel: #202425;
+      --panel-2: #282d2e;
+      --line: #383e3f;
+      --line-strong: #4c5354;
+      --text: #e4e7e5;
+      --muted: #9da4a1;
+      --accent: #d08a3c;
+      --accent-soft: #3d3327;
+      --good: #55a77c;
+      --warn: #d6a052;
+      --row-hover: #292e2f;
+      --selected: #303738;
+      --shadow: 0 18px 46px rgb(0 0 0 / 35%);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.4 Inter, "Segoe UI", Arial, sans-serif;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .page {
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .concept-bar {
+      max-width: 1480px;
+      margin: 0 auto 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      color: var(--muted);
+    }
+
+    .concept-bar strong { color: var(--text); font-size: 15px; }
+    .theme-switch { display: flex; border: 1px solid var(--line-strong); }
+
+    .theme-switch button {
+      border: 0;
+      border-right: 1px solid var(--line-strong);
+      background: var(--panel);
+      padding: 7px 13px;
+      cursor: pointer;
+    }
+
+    .theme-switch button:last-child { border-right: 0; }
+    .theme-switch button.active { background: var(--text); color: var(--panel); }
+
+    .app {
+      max-width: 1480px;
+      height: min(880px, calc(100vh - 82px));
+      min-height: 650px;
+      margin: auto;
+      display: grid;
+      grid-template-columns: 196px minmax(0, 1fr) 350px;
+      grid-template-rows: 48px minmax(0, 1fr) 30px;
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid var(--line-strong);
+      box-shadow: var(--shadow);
+    }
+
+    .titlebar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .mark {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      margin-right: 9px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      color: var(--accent);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .titlebar h1 { margin: 0; font-size: 15px; letter-spacing: .01em; }
+    .titlebar .vehicle { margin-left: 10px; color: var(--muted); font-size: 12px; }
+    .titlebar .window-actions { margin-left: auto; display: flex; gap: 20px; color: var(--muted); }
+
+    aside {
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .connection {
+      padding: 15px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow { margin-bottom: 5px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+    .connected { display: flex; align-items: center; gap: 7px; font-weight: 650; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+    .device { margin: 4px 0 0 15px; color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    nav { padding: 10px 8px; }
+
+    nav button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 0;
+      border-left: 3px solid transparent;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    nav button:hover { background: var(--row-hover); }
+    nav button.active { border-left-color: var(--accent); background: var(--selected); font-weight: 650; }
+    .nav-icon { width: 18px; color: var(--muted); text-align: center; }
+    .badge { margin-left: auto; padding: 0 6px; border: 1px solid var(--accent); color: var(--accent); font-size: 11px; font-weight: 700; }
+    .sidebar-foot { margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+
+    main { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+
+    .toolbar {
+      min-height: 62px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar h2 { margin: 0 auto 0 0; font-size: 18px; font-weight: 650; }
+    .button { padding: 7px 12px; border: 1px solid var(--line-strong); background: var(--panel); cursor: pointer; }
+    .button:hover { background: var(--row-hover); }
+    .button.primary { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 650; }
+    html[data-theme="console"] .button.primary { color: #171a1b; }
+    .button.danger { border-color: #9e3f3f; color: #b94a4a; }
+
+    .workspace { min-height: 0; display: grid; grid-template-columns: minmax(520px, 1fr) 300px; }
+    .data-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+    .filters { display: flex; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+
+    .filters input {
+      min-width: 0;
+      flex: 1;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      outline: none;
+      color: var(--text);
+      background: var(--panel);
+    }
+
+    .table-wrap { overflow: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { position: sticky; top: 0; z-index: 1; padding: 8px 11px; background: var(--panel-2); color: var(--muted); border-bottom: 1px solid var(--line-strong); text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .045em; }
+    td { padding: 8px 11px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    tbody tr:hover { background: var(--row-hover); }
+    tbody tr.selected { background: var(--selected); box-shadow: inset 3px 0 var(--accent); }
+    td.value { text-align: right; font: 600 13px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    td.status { color: var(--good); }
+
+    .inspector { min-height: 0; overflow: auto; padding: 17px; background: var(--panel); }
+    .inspector h3 { margin: 0; font-size: 15px; }
+    .reading { display: flex; align-items: baseline; gap: 7px; margin: 20px 0 5px; }
+    .reading strong { font: 700 34px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .reading span { color: var(--muted); }
+    .healthy { color: var(--good); font-size: 12px; font-weight: 700; text-transform: uppercase; }
+
+    .chart {
+      height: 188px;
+      margin: 18px 0;
+      border: 1px solid var(--line);
+      background: repeating-linear-gradient(to bottom, transparent 0, transparent 29px, var(--line) 30px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chart svg { width: 100%; height: 100%; }
+    .chart .rpm-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; }
+    .chart .load-line { fill: none; stroke: #55a77c; stroke-width: 2; vector-effect: non-scaling-stroke; }
+    .chart text { fill: var(--muted); font: 9px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .chart .axis { stroke: var(--line-strong); stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .trace-list { margin: 12px 0; border: 1px solid var(--line); }
+    .trace { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; padding: 7px 9px; border-bottom: 1px solid var(--line); font-size: 12px; }
+    .trace:last-child { border-bottom: 0; }
+    .trace-key { width: 9px; height: 3px; background: var(--accent); }
+    .trace-key.load { background: #55a77c; }
+    .trace strong { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .graph-meta { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); border-top: 0; }
+    .graph-meta div { padding: 6px 8px; border-right: 1px solid var(--line); }
+    .graph-meta div:last-child { border-right: 0; }
+    .graph-meta small { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+    .graph-meta strong { font: 600 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    dl { display: grid; grid-template-columns: 1fr 1.25fr; gap: 9px 14px; margin: 18px 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 12px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; }
+    .note { margin-top: 18px; padding: 11px; border-left: 3px solid var(--warn); background: var(--accent-soft); font-size: 12px; }
+    .view { display: none; min-height: 0; flex: 1; }
+    .view.active { display: contents; }
+
+    .assistant-dock {
+      grid-column: 3;
+      grid-row: 2;
+      min-width: 0;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--line-strong);
+      background: var(--panel-2);
+    }
+
+    .assistant-head { padding: 13px 14px; border-bottom: 1px solid var(--line); }
+    .assistant-head div { display: flex; align-items: center; gap: 8px; }
+    .assistant-head h2 { margin: 0; font-size: 14px; }
+    .assistant-head p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .assistant-context { padding: 9px 12px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+    .context-chip { display: inline-block; margin: 3px 3px 0 0; padding: 2px 6px; border: 1px solid var(--line-strong); color: var(--text); }
+    .messages { flex: 1; min-height: 0; overflow: auto; padding: 13px; }
+    .message { margin-bottom: 13px; padding: 10px; border-left: 2px solid var(--line-strong); background: var(--panel); font-size: 12px; }
+    .message.assistant { border-left-color: var(--accent); }
+    .message b { display: block; margin-bottom: 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+    .assistant-input { padding: 11px; border-top: 1px solid var(--line); }
+    .assistant-input textarea { width: 100%; min-height: 72px; resize: vertical; padding: 8px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--text); font: inherit; }
+    .assistant-actions { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+    .assistant-actions small { margin-right: auto; color: var(--muted); }
+
+    .statusbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 12px;
+      border-top: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .statusbar span:last-child { margin-left: auto; }
+
+    @media (max-width: 1250px) {
+      .app { grid-template-columns: 170px minmax(0, 1fr) 310px; }
+      .workspace { grid-template-columns: 1fr; }
+      .inspector { display: none; }
+    }
+
+    @media (max-width: 900px) {
+      .page { padding: 0; }
+      .concept-bar { padding: 10px; margin: 0; flex-wrap: wrap; }
+      .app { height: auto; min-height: 100vh; border-left: 0; border-right: 0; grid-template-columns: 58px minmax(0, 1fr); grid-template-rows: 48px minmax(560px, 1fr) 520px 30px; }
+      aside .connection, aside .sidebar-foot, nav button span:not(.nav-icon):not(.badge) { display: none; }
+      nav button { justify-content: center; }
+      .badge { position: absolute; transform: translate(12px, -10px); }
+      .assistant-dock { grid-column: 1 / -1; grid-row: 3; border-left: 0; border-top: 1px solid var(--line-strong); }
+      .statusbar { grid-row: 4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="concept-bar">
+      <div><strong>GUI direction study</strong> · Standalone prototype; application code is unchanged</div>
+      <div class="theme-switch" aria-label="Choose visual direction">
+        <button data-theme="workshop">A · Workshop</button>
+        <button data-theme="graphite">B · Graphite</button>
+        <button class="active" data-theme="console">C · Console</button>
+      </div>
+    </div>
+
+    <section class="app">
+      <header class="titlebar">
+        <div class="mark">Z</div>
+        <h1>370 OBD-II</h1>
+        <span class="vehicle">2010 Nissan 370Z · Z34</span>
+        <div class="window-actions"><span>—</span><span>□</span><span>×</span></div>
+      </header>
+
+      <aside>
+        <div class="connection">
+          <div class="eyebrow">Vehicle connection</div>
+          <div class="connected"><i class="dot"></i> Connected</div>
+          <div class="device">/dev/ttyUSB0</div>
+        </div>
+        <nav>
+          <button class="active" data-view="live"><span class="nav-icon">⌁</span><span>Live Data</span></button>
+          <button data-view="dtc"><span class="nav-icon">△</span><span>Trouble Codes</span><b class="badge">2</b></button>
+          <button><span class="nav-icon">▤</span><span>Service Manuals</span></button>
+          <button><span class="nav-icon">?</span><span>Assistant</span></button>
+          <button><span class="nav-icon">□</span><span>Tech Logbook</span></button>
+        </nav>
+        <div class="sidebar-foot">ISO 15765-4 CAN<br>ELM327 · 500 kbit/s</div>
+      </aside>
+
+      <main>
+        <section class="toolbar">
+          <h2 id="view-title">Live Data</h2>
+          <button class="button">Pause</button>
+          <button class="button primary">Scan Vehicle</button>
+        </section>
+
+        <div class="view active" id="live-view">
+          <section class="workspace">
+            <div class="data-pane">
+              <div class="filters">
+                <button class="button">All sensors ▾</button>
+                <input type="search" placeholder="Filter sensors">
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Sensor</th><th>Module</th><th>Value</th><th>Unit</th><th>Status</th></tr></thead>
+                  <tbody>
+                    <tr class="selected"><td>Engine RPM</td><td>ECM</td><td class="value">742</td><td>rpm</td><td class="status">OK</td></tr>
+                    <tr><td>Vehicle Speed</td><td>ECM</td><td class="value">0</td><td>km/h</td><td class="status">OK</td></tr>
+                    <tr><td>Coolant Temperature</td><td>ECM</td><td class="value">88</td><td>°C</td><td class="status">OK</td></tr>
+                    <tr><td>Intake Air Temperature</td><td>ECM</td><td class="value">34</td><td>°C</td><td class="status">OK</td></tr>
+                    <tr><td>Throttle Position</td><td>ECM</td><td class="value">14.1</td><td>%</td><td class="status">OK</td></tr>
+                    <tr><td>Engine Load</td><td>ECM</td><td class="value">23.5</td><td>%</td><td class="status">OK</td></tr>
+                    <tr><td>Mass Air Flow</td><td>ECM</td><td class="value">3.42</td><td>g/s</td><td class="status">OK</td></tr>
+                    <tr><td>Short Fuel Trim · Bank 1</td><td>ECM</td><td class="value">2.3</td><td>%</td><td class="status">OK</td></tr>
+                    <tr><td>Long Fuel Trim · Bank 1</td><td>ECM</td><td class="value">1.6</td><td>%</td><td class="status">OK</td></tr>
+                    <tr><td>Short Fuel Trim · Bank 2</td><td>ECM</td><td class="value">2.0</td><td>%</td><td class="status">OK</td></tr>
+                    <tr><td>Fuel Rail Pressure</td><td>ECM</td><td class="value">3290</td><td>kPa</td><td class="status">OK</td></tr>
+                    <tr><td>Battery Voltage</td><td>ECM</td><td class="value">13.9</td><td>V</td><td class="status">OK</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <aside class="inspector">
+              <h3>Engine RPM</h3>
+              <div class="reading"><strong>742</strong><span>rpm</span></div>
+              <div class="healthy">Within expected range</div>
+              <div class="trace-list">
+                <div class="trace"><i class="trace-key"></i><span>Engine RPM</span><strong>742 rpm</strong></div>
+                <div class="trace"><i class="trace-key load"></i><span>Engine Load</span><strong>23.5%</strong></div>
+              </div>
+              <div class="chart" aria-label="Time-series chart of engine RPM and calculated engine load over the last 60 seconds">
+                <svg viewBox="0 0 300 188" preserveAspectRatio="none" role="img">
+                  <line class="axis" x1="34" y1="10" x2="34" y2="164"/><line class="axis" x1="34" y1="164" x2="292" y2="164"/>
+                  <text x="3" y="16">1500</text><text x="9" y="90">750</text><text x="21" y="164">0</text>
+                  <text x="30" y="181">-60s</text><text x="152" y="181">-30s</text><text x="279" y="181">now</text>
+                  <polyline class="rpm-line" points="34,91 54,88 72,96 91,84 109,87 128,73 147,85 166,77 184,82 203,67 221,78 240,72 259,83 276,76 292,82"/>
+                  <polyline class="load-line" points="34,137 54,134 72,140 91,131 109,132 128,123 147,129 166,121 184,127 203,116 221,124 240,120 259,128 276,122 292,126"/>
+                </svg>
+              </div>
+              <div class="graph-meta"><div><small>Window</small><strong>60 seconds</strong></div><div><small>Sample rate</small><strong>10 Hz</strong></div><div><small>Dropped</small><strong>0 samples</strong></div></div>
+              <dl>
+                <dt>Command</dt><dd>010C</dd><dt>Source</dt><dd>OBD-II ECM</dd><dt>Range</dt><dd>0–8191.75 rpm</dd><dt>Update rate</dt><dd>10 Hz</dd><dt>Last update</dt><dd>10:23:47.125</dd>
+              </dl>
+              <button class="button">Add snapshot to Logbook</button>
+            </aside>
+          </section>
+        </div>
+
+        <div class="view" id="dtc-view">
+          <section class="workspace">
+            <div class="data-pane">
+              <div class="filters"><button class="button">All statuses ▾</button><input type="search" placeholder="Filter trouble codes"></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Code</th><th>Module</th><th>State</th><th>Description</th></tr></thead>
+                  <tbody>
+                    <tr class="selected"><td><strong>P0101</strong></td><td>ECM</td><td>Confirmed</td><td>Mass or Volume Air Flow Circuit Range/Performance</td></tr>
+                    <tr><td><strong>P0300</strong></td><td>ECM</td><td>Pending</td><td>Random/Multiple Cylinder Misfire Detected</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <aside class="inspector">
+              <h3>P0101</h3>
+              <div class="reading"><strong style="font-size:22px">Confirmed</strong></div>
+              <p>Mass or Volume Air Flow Circuit Range/Performance</p>
+              <dl><dt>Module</dt><dd>ECM</dd><dt>First recorded</dt><dd>Today, 10:23</dd><dt>MIL</dt><dd>On</dd><dt>Freeze frame</dt><dd>Available</dd></dl>
+              <button class="button">View Service Manual</button>
+              <button class="button">Add Note</button>
+              <div class="note">Clearing codes also resets readiness monitors. Repair and document the cause before clearing.</div>
+            </aside>
+          </section>
+        </div>
+      </main>
+
+      <aside class="assistant-dock" aria-label="Persistent diagnostic assistant">
+        <div class="assistant-head">
+          <div><i class="dot"></i><h2>Diagnostic Assistant</h2></div>
+          <p>Available throughout the application</p>
+        </div>
+        <div class="assistant-context">
+          Current context<br>
+          <span class="context-chip">Live scan</span><span class="context-chip">2 DTCs</span><span class="context-chip">Service manual</span>
+        </div>
+        <div class="messages">
+          <div class="message assistant"><b>Assistant</b>I can reference the current sensor stream, stored codes, service manual, and your logbook. What would you like to investigate?</div>
+          <div class="message"><b>You</b>Does the idle look stable?</div>
+          <div class="message assistant"><b>Assistant</b>RPM is currently 742 and has remained within a narrow band in this 60-second sample. Engine load is also steady. That supports a stable idle in this snapshot, but a longer capture after warm-up would be more useful.</div>
+        </div>
+        <div class="assistant-input">
+          <textarea placeholder="Ask about the current scan, a code, or the service manual"></textarea>
+          <div class="assistant-actions"><small>Uses visible diagnostic context</small><button class="button primary">Ask</button></div>
+        </div>
+      </aside>
+
+      <footer class="statusbar"><span>● Vehicle connected</span><span>VIN JN1AZ4EH7AM700123</span><span>2 DTCs</span><span>Last scan 10:23:47</span></footer>
+    </section>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    document.querySelectorAll('[data-theme]').forEach(button => {
+      button.addEventListener('click', () => {
+        root.dataset.theme = button.dataset.theme;
+        document.querySelectorAll('[data-theme]').forEach(item => item.classList.toggle('active', item === button));
+      });
+    });
+
+    document.querySelectorAll('[data-view]').forEach(button => {
+      button.addEventListener('click', () => {
+        const view = button.dataset.view;
+        document.querySelectorAll('[data-view]').forEach(item => item.classList.toggle('active', item === button));
+        document.querySelectorAll('.view').forEach(item => item.classList.remove('active'));
+        document.getElementById(`${view}-view`).classList.add('active');
+        document.getElementById('view-title').textContent = view === 'live' ? 'Live Data' : 'Trouble Codes';
+      });
+    });
+  </script>
+</body>
+</html>

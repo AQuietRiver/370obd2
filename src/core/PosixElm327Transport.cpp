@@ -3,6 +3,7 @@
 #include "core/ObdParser.hpp"
 
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <fcntl.h>
 #include <termios.h>
@@ -43,6 +44,8 @@ bool PosixElm327Transport::configurePort(std::string* error) {
     tty.c_cflag |= CLOCAL | CREAD;
     tty.c_cflag &= ~CRTSCTS;
     tty.c_cc[VMIN] = 0;
+    // With VMIN=0, VTIME=10 returns from an idle read after one second. The
+    // absolute deadline in readUntilPrompt also handles continuous junk data.
     tty.c_cc[VTIME] = 10;
 
     if (tcsetattr(fd_, TCSANOW, &tty) != 0) {
@@ -68,12 +71,16 @@ bool PosixElm327Transport::connect(std::string* error) {
         return false;
     }
 
-    for (const std::string& init : {"ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0"}) {
+    for (const char* init : {"ATZ", "ATE0", "ATL0", "ATS0", "ATH0", "ATSP0"}) {
         if (!writeLine(init, error)) {
             disconnect();
             return false;
         }
         readUntilPrompt(error);
+        if (error && !error->empty()) {
+            disconnect();
+            return false;
+        }
     }
     return true;
 }
@@ -98,9 +105,17 @@ bool PosixElm327Transport::writeLine(const std::string& line, std::string* error
 }
 
 std::string PosixElm327Transport::readUntilPrompt(std::string* error) {
+    constexpr auto totalTimeout = std::chrono::seconds(5);
+    const auto deadline = std::chrono::steady_clock::now() + totalTimeout;
     std::string raw;
     char buffer[128];
     for (;;) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            if (error) {
+                *error = "timed out waiting for ELM327 prompt";
+            }
+            return raw;
+        }
         const ssize_t count = read(fd_, buffer, sizeof(buffer));
         if (count < 0) {
             if (error) {

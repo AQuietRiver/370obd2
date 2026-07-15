@@ -20,7 +20,7 @@ struct EnhancedPidDefinition {
 
 class EnhancedPidProfile {
 public:
-    bool loadCsv(const std::string& path, std::string* error);
+    [[nodiscard]] bool loadCsv(const std::string& path, std::string* error);
     const std::vector<EnhancedPidDefinition>& definitions() const { return definitions_; }
     SensorValue decode(const EnhancedPidDefinition& definition, const ObdResponse& response) const;
 

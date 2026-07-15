@@ -3,7 +3,6 @@
 #include "core/PidRegistry.hpp"
 
 #include <cctype>
-#include <cstdlib>
 
 namespace obd {
 
@@ -11,6 +10,13 @@ namespace {
 
 char hexDigit(uint8_t nibble) {
     return nibble < 10 ? static_cast<char>('0' + nibble) : static_cast<char>('A' + (nibble - 10));
+}
+
+int hexValue(char digit) {
+    if (digit >= '0' && digit <= '9') return digit - '0';
+    if (digit >= 'a' && digit <= 'f') return digit - 'a' + 10;
+    if (digit >= 'A' && digit <= 'F') return digit - 'A' + 10;
+    return -1;
 }
 
 // Standard 2-byte DTC encoding: byte1 bits[7:6] select the letter, bits[5:4]
@@ -30,16 +36,20 @@ std::string decodeDtcCode(uint8_t high, uint8_t low) {
 } // namespace
 
 std::vector<uint8_t> ObdParser::parseHexBytes(const std::string& raw) {
-    std::string hex;
-    for (char ch : raw) {
-        if (std::isxdigit(static_cast<unsigned char>(ch))) {
-            hex.push_back(ch);
-        }
-    }
-
     std::vector<uint8_t> bytes;
-    for (size_t i = 0; i + 1 < hex.size(); i += 2) {
-        bytes.push_back(static_cast<uint8_t>(std::strtoul(hex.substr(i, 2).c_str(), nullptr, 16)));
+    bytes.reserve(raw.size() / 3);
+    int highNibble = -1;
+    for (char ch : raw) {
+        const int nibble = hexValue(ch);
+        if (nibble < 0) {
+            continue;
+        }
+        if (highNibble < 0) {
+            highNibble = nibble;
+        } else {
+            bytes.push_back(static_cast<uint8_t>((highNibble << 4) | nibble));
+            highNibble = -1;
+        }
     }
     return bytes;
 }

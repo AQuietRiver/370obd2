@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 
 static bool near(double actual, double expected) {
@@ -17,6 +18,30 @@ int main() {
         assert(bytes.size() == 4);
         assert(bytes[0] == 0x41);
         assert(bytes[3] == 0x40);
+    }
+
+    {
+        assert(obd::ObdParser::parseHexBytes("").empty());
+        assert(obd::ObdParser::parseHexBytes("not hex").empty());
+        const auto odd = obd::ObdParser::parseHexBytes("410C1");
+        assert(odd.size() == 2);
+        assert(odd[0] == 0x41);
+        assert(odd[1] == 0x0C);
+    }
+
+    {
+        const auto path = std::filesystem::temp_directory_path() / "370obd2-bad-profile.csv";
+        {
+            std::ofstream output(path);
+            output << "module,mode,pid,name,unit,scale,offset,valueBytes,description\n"
+                   << "7E0,22,1234,Bad PID,V,not-a-number,0,2,test\n";
+        }
+        obd::EnhancedPidProfile profile;
+        std::string error;
+        assert(!profile.loadCsv(path.string(), &error));
+        assert(error.find("line 2") != std::string::npos);
+        assert(profile.definitions().empty());
+        std::filesystem::remove(path);
     }
 
     {

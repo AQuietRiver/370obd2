@@ -60,16 +60,32 @@ bool EnhancedPidProfile::loadCsv(const std::string& path, std::string* error) {
         }
 
         EnhancedPidDefinition def;
-        def.module = cells[0];
-        def.mode = static_cast<uint8_t>(parseHex16(cells[1]));
-        def.pid = parseHex16(cells[2]);
-        def.name = cells[3];
-        def.unit = cells[4];
-        def.scale = std::stod(cells[5]);
-        def.offset = std::stod(cells[6]);
-        def.valueBytes = static_cast<size_t>(std::stoul(cells[7]));
-        if (cells.size() > 8) {
-            def.description = cells[8];
+        try {
+            def.module = cells[0];
+            const uint16_t parsedMode = parseHex16(cells[1]);
+            if (parsedMode > 0xFF) {
+                throw std::out_of_range("mode must fit in one byte");
+            }
+            def.mode = static_cast<uint8_t>(parsedMode);
+            def.pid = parseHex16(cells[2]);
+            def.name = cells[3];
+            def.unit = cells[4];
+            def.scale = std::stod(cells[5]);
+            def.offset = std::stod(cells[6]);
+            def.valueBytes = static_cast<size_t>(std::stoul(cells[7]));
+            if (def.valueBytes == 0 || def.valueBytes > sizeof(uint32_t)) {
+                throw std::out_of_range("valueBytes must be between 1 and 4");
+            }
+            if (cells.size() > 8) {
+                def.description = cells[8];
+            }
+        } catch (const std::exception& exception) {
+            definitions_.clear();
+            if (error) {
+                *error = "bad enhanced PID value at line " + std::to_string(lineNumber)
+                    + ": " + exception.what();
+            }
+            return false;
         }
         definitions_.push_back(def);
     }
@@ -91,7 +107,9 @@ SensorValue EnhancedPidProfile::decode(const EnhancedPidDefinition& definition, 
         return value;
     }
 
-    if (response.bytes.size() < 3 + definition.valueBytes) {
+    // Mode 22 responses echo one response-mode byte and the two-byte PID.
+    const size_t responseHeaderBytes = definition.pid > 0xFF ? 3 : 2;
+    if (response.bytes.size() < responseHeaderBytes + definition.valueBytes) {
         value.status = "raw-only";
         return value;
     }

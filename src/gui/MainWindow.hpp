@@ -2,6 +2,7 @@
 
 #include <QMainWindow>
 #include <QJsonArray>
+#include <QHash>
 #include <QStringList>
 
 class QTableWidget;
@@ -11,17 +12,27 @@ class QLabel;
 class QLineEdit;
 class QNetworkAccessManager;
 class QPushButton;
+class QProgressBar;
 class QTextEdit;
+class QThread;
+class QStackedWidget;
 
 namespace obd { struct CoverageReport; struct DtcReport; }
 
 namespace gui {
+
+class ScanWorker;
+class LiveDataChart;
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
     explicit MainWindow(QWidget* parent = nullptr);
+    ~MainWindow() override;
+
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
 
 private:
     void runSimulatorScan();
@@ -39,12 +50,15 @@ private:
     void viewTechLogbook();
     void displayReport(const obd::CoverageReport& report, const QString& source);
     void displayDtcs(const obd::DtcReport& report);
+    void setScanBusy(bool busy, const QString& message = {});
     QString sensorContext() const;
     QString logbookContext(const QString& question) const;
     QString manualContext(const QStringList& paths, const QString& question) const;
 
     QTableWidget* table_ = nullptr;
     QTableWidget* dtcTable_ = nullptr;
+    QStackedWidget* diagnosticPages_ = nullptr;
+    LiveDataChart* liveChart_ = nullptr;
     QCheckBox* aiEnabled_ = nullptr;
     QCheckBox* aiFreeOnly_ = nullptr;
     QComboBox* aiModel_ = nullptr;
@@ -59,10 +73,19 @@ private:
     QPushButton* aiRefreshModels_ = nullptr;
     QPushButton* aiForgetKey_ = nullptr;
     QPushButton* saveLogbook_ = nullptr;
+    QPushButton* simulatorScan_ = nullptr;
+    QPushButton* simulatorClear_ = nullptr;
+    QPushButton* vehicleScan_ = nullptr;
+    QPushButton* vehicleClear_ = nullptr;
+    QProgressBar* scanProgress_ = nullptr;
     QNetworkAccessManager* network_ = nullptr;
+    QThread* scanThread_ = nullptr;
+    ScanWorker* scanWorker_ = nullptr;
+    QWidget* titleBar_ = nullptr;
     QString aiApiKey_;
     QString scanSource_ = "No sensor scan has been run";
     QJsonArray availableModels_;
+    mutable QHash<QString, QString> manualTextCache_;
 };
 
 } // namespace gui
