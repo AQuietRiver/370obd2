@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">AI-assisted troubleshooting workflow</title>
+  <desc id="desc">Vehicle scans, service manuals, and technician notes provide context to the assistant, which returns likely causes, recommended checks, and relevant procedures.</desc>
+  <defs>
+    <style>
+      .label { fill: #f2f3f3; font: 600 17px Inter, "Segoe UI", sans-serif; }
+      .detail { fill: #9eabad; font: 14px Inter, "Segoe UI", sans-serif; }
+      .eyebrow { fill: #d98a2b; font: 600 12px Inter, "Segoe UI", sans-serif; letter-spacing: 1.5px; }
+      .line { fill: none; stroke: #657174; stroke-width: 2; }
+    </style>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0L8 4L0 8Z" fill="#657174"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="430" rx="14" fill="#171c1d"/>
+  <rect x="1" y="1" width="1198" height="428" rx="13" fill="none" stroke="#3a4547"/>
+  <text x="52" y="54" class="eyebrow">CONTEXT-AWARE DIAGNOSTICS</text>
+  <text x="52" y="88" class="label" font-size="25">From vehicle evidence to a practical next step</text>
+
+  <path class="line" marker-end="url(#arrow)" d="M292 163H438"/>
+  <path class="line" marker-end="url(#arrow)" d="M292 237H438"/>
+  <path class="line" marker-end="url(#arrow)" d="M292 311H438"/>
+  <path class="line" marker-end="url(#arrow)" d="M762 237H908"/>
+
+  <g>
+    <rect x="52" y="132" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <rect x="52" y="132" width="4" height="62" rx="2" fill="#d98a2b"/>
+    <text x="76" y="158" class="label">Vehicle scan</text>
+    <text x="76" y="179" class="detail">Live values and DTCs</text>
+
+    <rect x="52" y="206" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <text x="76" y="232" class="label">Service manuals</text>
+    <text x="76" y="253" class="detail">Selected procedures</text>
+
+    <rect x="52" y="280" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <text x="76" y="306" class="label">Technician logbook</text>
+    <text x="76" y="327" class="detail">History and observations</text>
+  </g>
+
+  <g>
+    <rect x="438" y="153" width="324" height="168" rx="8" fill="#252c2d" stroke="#d98a2b" stroke-width="2"/>
+    <text x="470" y="186" class="eyebrow">DIAGNOSTIC ASSISTANT</text>
+    <text x="470" y="224" class="label" font-size="22">Correlates the evidence</text>
+    <text x="470" y="252" class="detail">Uses only the context you select</text>
+    <line x1="470" y1="272" x2="730" y2="272" stroke="#3a4547"/>
+    <text x="470" y="298" class="detail">Optional OpenRouter model</text>
+  </g>
+
+  <g>
+    <rect x="908" y="132" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <text x="932" y="158" class="label">Likely causes</text>
+    <text x="932" y="179" class="detail">Ranked from the evidence</text>
+
+    <rect x="908" y="206" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <rect x="1144" y="206" width="4" height="62" rx="2" fill="#d98a2b"/>
+    <text x="932" y="232" class="label">Recommended checks</text>
+    <text x="932" y="253" class="detail">A practical next step</text>
+
+    <rect x="908" y="280" width="240" height="62" rx="6" fill="#22292a" stroke="#3a4547"/>
+    <text x="932" y="306" class="label">Relevant procedures</text>
+    <text x="932" y="327" class="detail">Grounded in your manuals</text>
+  </g>
+
+  <text x="52" y="392" class="detail">Recommendations should be confirmed with service information and physical testing.</text>
+</svg>

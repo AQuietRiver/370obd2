@@ -33,33 +33,13 @@ The built-in diagnostic assistant helps turn scan results into a practical troub
 
 Ask about a fault code, an unusual sensor reading, or a symptom such as a rough idle. The assistant can correlate the available evidence, suggest likely causes, identify useful manual procedures, and propose the next checks to perform. Responses can be saved to the logbook so the investigation remains available for later sessions.
 
-```mermaid
-flowchart LR
-    A[Vehicle scan] --> D[Diagnostic context]
-    B[Service manuals] --> D
-    C[Technician logbook] --> D
-    D --> E[AI assistant]
-    E --> F[Likely causes]
-    E --> G[Recommended checks]
-    E --> H[Relevant procedures]
-```
+![AI-assisted troubleshooting workflow](docs/images/assistant-workflow.svg)
 
 The assistant is optional and uses OpenRouter. You control when it is used and which available context is included. Its recommendations are a troubleshooting aid and should be verified against service information and physical testing before repairs are made.
 
 ## How it fits together
 
-```mermaid
-flowchart LR
-    A[370Z ECU] --> B[ELM327 USB adapter]
-    B --> C[Serial transport]
-    D[Built-in simulator] --> E[OBD core]
-    C --> E
-    F[Enhanced PID profiles] --> E
-    E --> G[Qt desktop console]
-    E --> H[Command-line client]
-    G --> I[Manuals and logbook]
-    G --> J[Optional OpenRouter assistant]
-```
+![370 OBD-II system overview](docs/images/system-overview.svg)
 
 The shared `obdcore` library owns protocol parsing, PID discovery, decoding, scan sessions, and transport behavior. Both interfaces use the same diagnostic implementation.
 
